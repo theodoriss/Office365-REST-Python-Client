@@ -5,6 +5,7 @@ from office365.runtime.auth.providers.saml_token_provider import SamlTokenProvid
 from office365.runtime.auth.token_response import TokenResponse
 from office365.runtime.auth.user_credential import UserCredential
 
+import logging
 
 class AuthenticationContext(object):
 
@@ -28,6 +29,7 @@ class AuthenticationContext(object):
         """
 
         def _acquire_token_for_client_certificate():
+            logging.info('logging into SharePoint.....')
             authority_url = 'https://login.microsoftonline.com/{0}'.format(tenant)
             credentials = {"thumbprint": thumbprint, "private_key": open(cert_path).read()}
             scopes = kwargs.get('scopes', ["{url}/.default".format(url=self.authority_url)])
@@ -37,7 +39,18 @@ class AuthenticationContext(object):
                 authority=authority_url,
                 client_credential=credentials,
             )
-            result = app.acquire_token_for_client(scopes)
+            result=None
+            result = app.acquire_token_silent(scopes, account=None)
+            if not result:
+                logging.info("No suitable token exists in cache. Let's get a new one from AAD.")
+                result = app.acquire_token_for_client(scopes)
+                
+            if "access_token" in result:
+                logging.info('Access token exists and is still valid')
+                
+            else:
+                logging.error('Could not authenticate')
+
             return TokenResponse.from_json(result)
 
         self.register_provider(_acquire_token_for_client_certificate)
